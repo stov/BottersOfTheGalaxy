@@ -1,11 +1,10 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26124.0
+VisualStudioVersion = 15.0.27130.2027
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{9DBF3224-8E70-4DA1-895B-63A32B334A0C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BottersOfTheGalaxy", "src\BottersOfTheGalaxy\BottersOfTheGalaxy.csproj", "{760351AB-5DBE-47CD-A8BB-B656D4666A26}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BottersOfTheGalaxy", "src\BottersOfTheGalaxy\BottersOfTheGalaxy.csproj", "{760351AB-5DBE-47CD-A8BB-B656D4666A26}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,24 +15,27 @@ Global
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x64.ActiveCfg = Debug|x64
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x64.Build.0 = Debug|x64
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x86.ActiveCfg = Debug|x86
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x86.Build.0 = Debug|x86
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x64.Build.0 = Debug|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Debug|x86.Build.0 = Debug|Any CPU
 		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|Any CPU.Build.0 = Release|Any CPU
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x64.ActiveCfg = Release|x64
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x64.Build.0 = Release|x64
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x86.ActiveCfg = Release|x86
-		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x86.Build.0 = Release|x86
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x64.ActiveCfg = Release|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x64.Build.0 = Release|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x86.ActiveCfg = Release|Any CPU
+		{760351AB-5DBE-47CD-A8BB-B656D4666A26}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{760351AB-5DBE-47CD-A8BB-B656D4666A26} = {9DBF3224-8E70-4DA1-895B-63A32B334A0C}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CB3BD384-AEBC-4463-A35C-40F41B2C7B42}
 	EndGlobalSection
 EndGlobal

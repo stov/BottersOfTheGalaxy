@@ -8,3 +8,4 @@ C:\Users\micro\source\repos\BottersOfTheGalaxy\src\BottersOfTheGalaxy\obj\Debug\
 C:\Users\micro\source\repos\BottersOfTheGalaxy\src\BottersOfTheGalaxy\obj\Debug\netcoreapp2.0\BottersOfTheGalaxy.AssemblyInfo.cs
 C:\Users\micro\source\repos\BottersOfTheGalaxy\src\BottersOfTheGalaxy\obj\Debug\netcoreapp2.0\BottersOfTheGalaxy.dll
 C:\Users\micro\source\repos\BottersOfTheGalaxy\src\BottersOfTheGalaxy\obj\Debug\netcoreapp2.0\BottersOfTheGalaxy.pdb
+C:\Users\micro\source\repos\BottersOfTheGalaxy\src\BottersOfTheGalaxy\obj\Debug\netcoreapp2.0\BottersOfTheGalaxy.csprojResolveAssemblyReference.cache
