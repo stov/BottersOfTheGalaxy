@@ -11,6 +11,10 @@ using System.Collections.Generic;
  **/
 class Player
 {
+    // TODO:
+    // Add logic for buying/selling items
+    // Add last-hitting and denying
+
     static void Main(string[] args)
     {
         /* May be useful later
@@ -184,6 +188,16 @@ static class Action
     public static void MoveAttack(int x, int y, int unitId)
     {
         Console.WriteLine($"MOVE_ATTACK {x} {y} {unitId}");
+    }
+
+    public static void Buy(string itemName)
+    {
+        Console.WriteLine($"BUY {itemName}");
+    }
+
+    public static void Sell(string itemName)
+    {
+        Console.WriteLine($"SELL {itemName}");
     }
 }
 
