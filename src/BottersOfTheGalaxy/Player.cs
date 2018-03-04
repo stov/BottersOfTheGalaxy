@@ -17,6 +17,7 @@ class Player
 
     static void Main(string[] args)
     {
+        GameState.MyItems = new List<Item>();
         /* May be useful later
         GameState.Heroes = new List<Hero>();
         GameState.Heroes.Add(new Hero("Deadpool", 1380, 100, 80, 200, 1, 110));
@@ -44,8 +45,10 @@ class Player
         GameState.Items = new List<Item>();
         for (int i = 0; i < GameState.ItemCount; i++)
         {
-            inputs = Console.ReadLine().Split(' ');
+            string readLine = Console.ReadLine();
+            inputs = readLine.Split(' ');
             GameState.Items.Add(new Item(inputs));
+            //Console.Error.WriteLine(readLine);
         }
 
         // game loop
@@ -71,7 +74,17 @@ class Player
             }
             else
             {
-                Command.Push();
+                if (GameState.MyItems.Count < 4 &&
+                    GameState.Items.Any(i => i.itemCost < GameState.Gold &&
+                        i.itemName.ToLower().Contains("blade") &&
+                        i.itemName.ToLower().Contains("bronze") == false))
+                {
+                    Command.BuyItems();
+                }
+                else
+                {
+                    Command.Push();
+                }
             }
         }
     }
@@ -111,9 +124,28 @@ static class Command
                 // Do nothing, continue to attack phase
             }
         }
-        else if (enemyTower.distanceFromEntity(hero) < enemyTower.distanceFromEntity(furthestFriendlyUnit))
+        else if (GameState.Entities
+            .Any(u => u.unitType == "UNIT" &&
+                u.team == GameState.MyTeam &&
+                u.health < hero.attackDamage &&
+                u.distanceFromEntity(hero) <= hero.attackRange))
         {
-            Action.Move(friendlyTower.x, friendlyTower.y);
+            // Can kill friendly unit for gold
+            Entity killEntity = GameState.Entities
+                .First(u => u.unitType == "UNIT" &&
+                    u.team == GameState.MyTeam &&
+                    u.health < hero.attackDamage &&
+                    u.distanceFromEntity(hero) <= hero.attackRange);
+            Action.Attack(killEntity.unitId);
+            return;
+        }
+        else if ((enemyTower.distanceFromEntity(hero) - 100) <= enemyTower.distanceFromEntity(furthestFriendlyUnit))
+        {
+            if (furthestFriendlyUnit.x > friendlyTower.x)
+                Action.Move(furthestFriendlyUnit.x - 50, furthestFriendlyUnit.y);
+            else
+                Action.Move(furthestFriendlyUnit.x + 50, furthestFriendlyUnit.y);
+
             return;
         }
 
@@ -121,7 +153,8 @@ static class Command
         // If enemy hero is in attack range, and enemy units are not
         // Then attack enemy hero
         if (enemyHero != null
-            && unitThreat == null)
+            && unitThreat == null
+            && enemyTower.distanceFromEntity(hero) > 300)
         {
             Action.AttackNearest("HERO");
             return;
@@ -154,6 +187,21 @@ static class Command
                 Action.Attack(enemyTower.unitId);
                 return;
             }
+        }
+    }
+
+    public static void BuyItems()
+    {
+        Item newItem = GameState.Items
+            .OrderByDescending(i => i.itemCost)
+            .FirstOrDefault(i => i.itemCost < GameState.Gold &&
+                i.itemName.ToLower().Contains("blade") &&
+                i.itemName.ToLower().Contains("bronze") == false);
+
+        if (newItem != null)
+        {
+            Action.Buy(newItem.itemName);
+            GameState.MyItems.Add(newItem);
         }
     }
 }
@@ -288,7 +336,7 @@ class Entity
     }
 }
 
-class Hero : Entity
+/*class Hero : Entity
 {
     public Hero(string heroType, int health, int mana, int attackDamage,
         int movementSpeed, int manaRegeneration, int attackRange)
@@ -302,7 +350,7 @@ class Hero : Entity
         this.manaRegeneration = manaRegeneration;
         this.attackRange = attackRange;
     }
-}
+}*/
 
 class GameState
 {
@@ -313,7 +361,8 @@ class GameState
     public static int EntityCount { get; set; }
     public static int ItemCount { get; set; }
     
-    public static List<Hero> Heroes;
+    //public static List<Hero> Heroes;
     public static List<Entity> Entities;
     public static List<Item> Items;
+    public static List<Item> MyItems;
 }
