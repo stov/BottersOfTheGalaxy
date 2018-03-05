@@ -12,13 +12,16 @@ using System.Collections.Generic;
 class Player
 {
     // TODO:
-    // Add logic for buying/selling items
-    // Add last-hitting and denying
+    // Improve positioning around enemy tower
+    // Add logic for bushes, spawns, groot
+    // Code for multiple heroes
+    // Fix positioning of 2nd hero/both heroes
 
     static void Main(string[] args)
     {
         GameState.MyItems = new List<Item>();
-        /* May be useful later
+
+        /*
         GameState.Heroes = new List<Hero>();
         GameState.Heroes.Add(new Hero("Deadpool", 1380, 100, 80, 200, 1, 110));
         GameState.Heroes.Add(new Hero("Doctor Strange", 950, 300, 50, 200, 2, 245));
@@ -29,26 +32,22 @@ class Player
 
         string[] inputs;
         GameState.MyTeam = int.Parse(Console.ReadLine());
-        int bushAndSpawnPointCount = int.Parse(Console.ReadLine()); // usefrul from wood1, represents the number of bushes and the number of places where neutral units can spawn
+        int bushAndSpawnPointCount = int.Parse(Console.ReadLine()); // useful from wood1, represents the number of bushes and the number of places where neutral units can spawn
         for (int i = 0; i < bushAndSpawnPointCount; i++)
         {
             inputs = Console.ReadLine().Split(' ');
-            /*
+            
             string entityType = inputs[0]; // BUSH, from wood1 it can also be SPAWN
             int x = int.Parse(inputs[1]);
             int y = int.Parse(inputs[2]);
             int radius = int.Parse(inputs[3]);
-            */
         }
 
         GameState.ItemCount = int.Parse(Console.ReadLine()); // useful from wood2
         GameState.Items = new List<Item>();
         for (int i = 0; i < GameState.ItemCount; i++)
         {
-            string readLine = Console.ReadLine();
-            inputs = readLine.Split(' ');
-            GameState.Items.Add(new Item(inputs));
-            //Console.Error.WriteLine(readLine);
+            GameState.Items.Add(new Item(Console.ReadLine().Split(' ')));
         }
 
         // game loop
@@ -62,43 +61,53 @@ class Player
             GameState.Entities = new List<Entity>();
             for (int i = 0; i < GameState.EntityCount; i++)
             {
-                inputs = Console.ReadLine().Split(' ');
-                GameState.Entities.Add(new Entity(inputs));
+                GameState.Entities.Add(new Entity(Console.ReadLine().Split(' ')));
             }
-
+            
             // Write an action using Console.WriteLine()
             // To debug: Console.Error.WriteLine("Debug messages...");
             if (GameState.RoundType < 0)
             {
-                Action.ChooseHero();
+                Actions.ChooseHero();
             }
             else
             {
-                if (GameState.MyItems.Count < 4 &&
-                    GameState.Items.Any(i => i.itemCost < GameState.Gold &&
-                        i.itemName.ToLower().Contains("blade") &&
-                        i.itemName.ToLower().Contains("bronze") == false))
-                {
-                    Command.BuyItems();
-                }
-                else
-                {
-                    Command.Push();
-                }
+                Commands.CommandHeroes();
             }
         }
     }
 }
 
-static class Command
+static class Commands
 {
-    public static void Push()
+    public static void CommandHeroes()
     {
-        Entity hero = GameState.Entities
-            .FirstOrDefault(h => h.team == GameState.MyTeam && h.unitType == "HERO");
+        foreach (Entity hero in GameState.MyHeroes)
+        {
+            if (hero.itemsOwned < 4 &&
+                GameState.Items.Any(i => i.itemCost < GameState.Gold &&
+                    i.itemName.ToLower().Contains("blade")
+                    //&& i.itemName.ToLower().Contains("bronze") == false
+                    ))
+            {
+                BuyItems(hero);
+            }
+            else
+            {
+                OrderHero(hero);
+            }
+        }
+    }
+
+    public static void OrderHero(Entity hero)
+    {
+        // TODO: Check grouping of units N/E/S/W + on hero (enemy & friendly)
+        // Check range of GROOT vs range of enemy hero/units
+        // MoveAttack
+
         Entity enemyHero = GameState.Entities
-            .FirstOrDefault(e => e.team != GameState.MyTeam && e.unitType == "HERO"
-            && e.distanceFromEntity(hero) < hero.attackRange);
+            .OrderBy(e => e.distanceFromEntity(hero))
+            .FirstOrDefault(e => e.team != GameState.MyTeam && e.unitType == "HERO");
         Entity friendlyTower = GameState.Entities
             .FirstOrDefault(h => h.team == GameState.MyTeam && h.unitType == "TOWER");
         Entity enemyTower = GameState.Entities
@@ -108,15 +117,37 @@ static class Command
             && u.distanceFromEntity(hero) > 300);
         Entity closestEnemyUnit = GameState.Entities.OrderBy(u => u.distanceFromEntity(friendlyTower))
             .FirstOrDefault(u => u.team != GameState.MyTeam && u.unitType == "UNIT");
-        Entity furthestFriendlyUnit = GameState.Entities.OrderByDescending(u => u.distanceFromEntity(friendlyTower))
-            .FirstOrDefault(u => u.team == GameState.MyTeam && u.unitType == "UNIT");
+        Entity furthestFriendlyUnit = GameState.Entities
+            .OrderBy(u => u.distanceFromEntity(enemyTower))
+            .FirstOrDefault(u => u.team == GameState.MyTeam &&
+                u.unitType == "UNIT");
+
+        // If very safe and GROOT nearby, kill GROOT
+        if (GameState.IsEasyGrootKill)
+        {
+            KillGroot(hero);
+            return;
+        }
+
+        if (GameState.AreUnitsAdvancing)
+        {
+            AdvanceWithUnits();
+            return;
+        }
+
+        if (GameState.AreEnemyHeroesOverPushed)
+        {
+            KiteEnemyHeroesToTower();
+            return;
+        }
+
 
         // Retreat if required
         if (furthestFriendlyUnit == null)
         {
             if (hero.distanceFromEntity(friendlyTower) > 100)
             {
-                Action.Move(friendlyTower.x, friendlyTower.y);
+                Actions.Move(friendlyTower.x, friendlyTower.y);
                 return;
             }
             else
@@ -131,20 +162,22 @@ static class Command
                 u.distanceFromEntity(hero) <= hero.attackRange))
         {
             // Can kill friendly unit for gold
+            Console.Error.WriteLine("Deny");
             Entity killEntity = GameState.Entities
                 .First(u => u.unitType == "UNIT" &&
                     u.team == GameState.MyTeam &&
                     u.health < hero.attackDamage &&
                     u.distanceFromEntity(hero) <= hero.attackRange);
-            Action.Attack(killEntity.unitId);
+            Actions.Attack(killEntity.unitId);
             return;
         }
         else if ((enemyTower.distanceFromEntity(hero) - 100) <= enemyTower.distanceFromEntity(furthestFriendlyUnit))
         {
+            Console.Error.WriteLine("Retreat behind friendly unit");
             if (furthestFriendlyUnit.x > friendlyTower.x)
-                Action.Move(furthestFriendlyUnit.x - 50, furthestFriendlyUnit.y);
+                Actions.Move(furthestFriendlyUnit.x - 50, furthestFriendlyUnit.y);
             else
-                Action.Move(furthestFriendlyUnit.x + 50, furthestFriendlyUnit.y);
+                Actions.Move(furthestFriendlyUnit.x + 50, furthestFriendlyUnit.y);
 
             return;
         }
@@ -156,12 +189,14 @@ static class Command
             && unitThreat == null
             && enemyTower.distanceFromEntity(hero) > 300)
         {
-            Action.AttackNearest("HERO");
+            Console.Error.WriteLine("Attack enemy hero");
+            Actions.Attack(enemyHero.unitId);
             return;
         }
         else
         {
             // Target closest unit by default
+            Console.Error.WriteLine("Target closest unit");
             Entity targetEnemy = GameState.Entities
                 .OrderBy(u => u.distanceFromEntity(hero))
                 .FirstOrDefault(u => u.team != GameState.MyTeam && u.unitType == "UNIT");
@@ -174,43 +209,75 @@ static class Command
 
             if (lowHealthEnemyUnit != null)
             {
+                Console.Error.WriteLine("Target low health unit");
                 targetEnemy = lowHealthEnemyUnit;
             }
 
             if (targetEnemy != null)
             {
-                Action.Attack(targetEnemy.unitId);
+                Console.Error.WriteLine("Attack unit");
+                Actions.Attack(targetEnemy.unitId);
                 return;
             }
             else
             {
-                Action.Attack(enemyTower.unitId);
+                Console.Error.WriteLine("Attack enemy tower");
+                Actions.Attack(enemyTower.unitId);
                 return;
             }
         }
     }
 
-    public static void BuyItems()
+    private static void KiteEnemyHeroesToTower()
+    {
+        throw new NotImplementedException();
+    }
+
+    private static void AdvanceWithUnits()
+    {
+        throw new NotImplementedException();
+    }
+
+    private static void KillGroot(Entity hero)
+    {
+        Entity targetGroot = GameState.Entities
+            .OrderBy(g => g.distanceFromEntity(hero))
+            .FirstOrDefault(g => g.unitType == "GROOT"
+                && (GameState.EnemyHasNo("UNIT") || g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("UNIT", GameState.EnemyTeam)))
+                && (g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("HERO", GameState.EnemyTeam)))
+                && (g.distanceFromEntity(GameState.MyTower) < g.distanceFromEntity(GameState.EnemyTower)));
+        Actions.MoveAttack(targetGroot.x, targetGroot.y, targetGroot.unitId);
+    }
+
+    public static void BuyItems(Entity hero)
     {
         Item newItem = GameState.Items
             .OrderByDescending(i => i.itemCost)
             .FirstOrDefault(i => i.itemCost < GameState.Gold &&
-                i.itemName.ToLower().Contains("blade") &&
-                i.itemName.ToLower().Contains("bronze") == false);
+                i.itemName.ToLower().Contains("blade")
+                //&& i.itemName.ToLower().Contains("bronze") == false
+                );
 
         if (newItem != null)
         {
-            Action.Buy(newItem.itemName);
-            GameState.MyItems.Add(newItem);
+            Actions.Buy(newItem.itemName);
+            //hero.items.Add(newItem);
         }
     }
 }
 
-static class Action
+static class Actions
 {
     public static void ChooseHero()
     {
-        Console.WriteLine("IRONMAN");
+        if (GameState.MyHeroes.Count == 0)
+        {
+            Console.WriteLine("IRONMAN");
+        }
+        else
+        {
+            Console.WriteLine("VALKYRIE");
+        }
     }
 
     public static void Wait()
@@ -295,6 +362,16 @@ class Entity
 
     public string heroType { get; set; }
     public int manaRegeneration { get; set; }
+    public int goldValue { get; set; }
+    public int isVisible { get; set; }
+    public int itemsOwned { get; set; }
+
+    public List<Item> items { get; set; }
+    
+    public Entity()
+    {
+        items = new List<Item>();
+    }
 
     public Entity(string[] inputs)
     {
@@ -310,7 +387,7 @@ class Entity
         attackDamage = int.Parse(inputs[9]);
         movementSpeed = int.Parse(inputs[10]);
         //stunDuration = int.Parse(inputs[11]), // useful in bronze
-        //goldValue = int.Parse(inputs[12]),
+        goldValue = int.Parse(inputs[12]);
         //countDown1 = int.Parse(inputs[13]), // all countDown and mana variables are useful starting in bronze
         //countDown2 = int.Parse(inputs[14]),
         //countDown3 = int.Parse(inputs[15]),
@@ -318,8 +395,8 @@ class Entity
         maxMana = int.Parse(inputs[17]);
         manaRegeneration = int.Parse(inputs[18]);
         heroType = inputs[19]; // DEADPOOL, VALKYRIE, DOCTOR_STRANGE, HULK, IRONMAN
-        //isVisible = int.Parse(inputs[20]), // 0 if it isn't
-        //itemsOwned = int.Parse(inputs[21]), // useful from wood1
+        isVisible = int.Parse(inputs[20]); // 0 if it isn't
+        itemsOwned = int.Parse(inputs[21]); // useful from wood1
     }
 
     public bool isRanged
@@ -334,14 +411,23 @@ class Entity
 
         return Convert.ToInt32(Math.Sqrt((xDistance * xDistance) + (yDistance * yDistance)));
     }
+
+    public Entity nearestEntity(string unitType, int team)
+    {
+        Entity entity = GameState.Entities
+            .OrderBy(e => e.distanceFromEntity(this))
+            .FirstOrDefault(e => e.unitType == "unitType"
+                && e.team == team);
+        return entity;
+    }
 }
 
-/*class Hero : Entity
+class Hero : Entity
 {
     public Hero(string heroType, int health, int mana, int attackDamage,
         int movementSpeed, int manaRegeneration, int attackRange)
     {
-        this.unitType = "HERO";
+        unitType = "HERO";
         this.heroType = heroType;
         this.health = health;
         this.mana = mana;
@@ -350,19 +436,57 @@ class Entity
         this.manaRegeneration = manaRegeneration;
         this.attackRange = attackRange;
     }
-}*/
+}
 
 class GameState
 {
     public static int MyTeam { get; set; }
+    public static int EnemyTeam {
+        get
+        {
+            return MyTeam == 1 ? 0 : 1;
+        }
+    }
     public static int Gold { get; set; }
     public static int EnemyGold { get; set; }
     public static int RoundType { get; set; }
     public static int EntityCount { get; set; }
     public static int ItemCount { get; set; }
     
-    //public static List<Hero> Heroes;
+    public static List<Hero> Heroes;
     public static List<Entity> Entities;
     public static List<Item> Items;
     public static List<Item> MyItems;
+
+    public static List<Entity> MyHeroes
+    {
+        get
+        {
+            return Entities.Where(e => e.unitType == "HERO").ToList<Entity>();
+        }
+    }
+
+    public static bool IsEasyGrootKill
+    {
+        get
+        {
+            Entity targetGroot
+
+            return false;
+        }
+    }
+    public static bool AreUnitsAdvancing
+    {
+        get
+        {
+            return false;
+        }
+    }
+    public static bool AreEnemyHeroesOverPushed
+    {
+        get
+        {
+            return false;
+        }
+    }
 }
