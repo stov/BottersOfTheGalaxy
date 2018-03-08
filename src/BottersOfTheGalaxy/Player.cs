@@ -19,28 +19,14 @@ class Player
 
     static void Main(string[] args)
     {
-        GameState.MyItems = new List<Item>();
-
-        /*
-        GameState.Heroes = new List<Hero>();
-        GameState.Heroes.Add(new Hero("Deadpool", 1380, 100, 80, 200, 1, 110));
-        GameState.Heroes.Add(new Hero("Doctor Strange", 950, 300, 50, 200, 2, 245));
-        GameState.Heroes.Add(new Hero("Hulk", 1450, 90, 80, 200, 1, 95));
-        GameState.Heroes.Add(new Hero("Ironman", 820, 200, 60, 200, 2, 270));
-        GameState.Heroes.Add(new Hero("Valkyrie", 1400, 155, 65, 200, 2, 130));
-        */
-
-        string[] inputs;
+        #region Initial setup
         GameState.MyTeam = int.Parse(Console.ReadLine());
-        int bushAndSpawnPointCount = int.Parse(Console.ReadLine()); // useful from wood1, represents the number of bushes and the number of places where neutral units can spawn
-        for (int i = 0; i < bushAndSpawnPointCount; i++)
+
+        GameState.ObjectCount = int.Parse(Console.ReadLine()); // useful from wood1, represents the number of bushes and the number of places where neutral units can spawn
+        GameState.Objects = new List<Object>();
+        for (int i = 0; i < GameState.ObjectCount; i++)
         {
-            inputs = Console.ReadLine().Split(' ');
-            
-            string entityType = inputs[0]; // BUSH, from wood1 it can also be SPAWN
-            int x = int.Parse(inputs[1]);
-            int y = int.Parse(inputs[2]);
-            int radius = int.Parse(inputs[3]);
+            GameState.Objects.Add(new Object(Console.ReadLine().Split(' ')));
         }
 
         GameState.ItemCount = int.Parse(Console.ReadLine()); // useful from wood2
@@ -49,21 +35,25 @@ class Player
         {
             GameState.Items.Add(new Item(Console.ReadLine().Split(' ')));
         }
+        #endregion
 
         // game loop
         while (true)
         {
+            #region Game loop setup
             GameState.Gold = int.Parse(Console.ReadLine());
             GameState.EnemyGold = int.Parse(Console.ReadLine());
             GameState.RoundType = int.Parse(Console.ReadLine()); // a positive value will show the number of heroes that await a command
-            GameState.EntityCount = int.Parse(Console.ReadLine());
 
+            GameState.EntityCount = int.Parse(Console.ReadLine());
             GameState.Entities = new List<Entity>();
             for (int i = 0; i < GameState.EntityCount; i++)
             {
                 GameState.Entities.Add(new Entity(Console.ReadLine().Split(' ')));
             }
-            
+            #endregion
+
+            #region Process an action
             // Write an action using Console.WriteLine()
             // To debug: Console.Error.WriteLine("Debug messages...");
             if (GameState.RoundType < 0)
@@ -74,6 +64,7 @@ class Player
             {
                 Commands.CommandHeroes();
             }
+            #endregion
         }
     }
 }
@@ -87,10 +78,10 @@ static class Commands
             if (hero.itemsOwned < 4 &&
                 GameState.Items.Any(i => i.itemCost < GameState.Gold &&
                     i.itemName.ToLower().Contains("blade")
-                    //&& i.itemName.ToLower().Contains("bronze") == false
+                    && i.itemName.ToLower().Contains("bronze") == false
                     ))
             {
-                BuyItems(hero);
+                BuyWeapon(hero);
             }
             else
             {
@@ -108,46 +99,63 @@ static class Commands
         Entity enemyHero = GameState.Entities
             .OrderBy(e => e.distanceFromEntity(hero))
             .FirstOrDefault(e => e.team != GameState.MyTeam && e.unitType == "HERO");
-        Entity friendlyTower = GameState.Entities
-            .FirstOrDefault(h => h.team == GameState.MyTeam && h.unitType == "TOWER");
-        Entity enemyTower = GameState.Entities
-            .FirstOrDefault(h => h.team != GameState.MyTeam && h.unitType == "TOWER");
         Entity unitThreat = GameState.Entities
             .FirstOrDefault(u => u.team != GameState.MyTeam && u.unitType == "UNIT"
             && u.distanceFromEntity(hero) > 300);
-        Entity closestEnemyUnit = GameState.Entities.OrderBy(u => u.distanceFromEntity(friendlyTower))
+        Entity closestEnemyUnit = GameState.Entities.OrderBy(u => u.distanceFromEntity(GameState.MyTower))
             .FirstOrDefault(u => u.team != GameState.MyTeam && u.unitType == "UNIT");
         Entity furthestFriendlyUnit = GameState.Entities
-            .OrderBy(u => u.distanceFromEntity(enemyTower))
+            .OrderBy(u => u.distanceFromEntity(GameState.EnemyTower))
             .FirstOrDefault(u => u.team == GameState.MyTeam &&
                 u.unitType == "UNIT");
+        var myUnitsAroundEnemyHero = GameState.Entities
+            .Where(e => e.team == GameState.MyTeam
+                && e.unitType == "UNIT"
+                && e.distanceFromEntity(enemyHero) <= 400);
+        var enemyUnitsAroundEnemyHero = GameState.Entities
+            .Where(e => e.team == GameState.EnemyTeam
+                && e.unitType == "UNIT"
+                && e.distanceFromEntity(enemyHero) <= 400);
+
+        //Ambush(hero);
+        //return;
 
         // If very safe and GROOT nearby, kill GROOT
-        if (GameState.IsEasyGrootKill)
+        /*if (GameState.IsEasyGrootKill(hero))
         {
             KillGroot(hero);
             return;
+        }*/
+
+        // If dying, get potion
+        if (hero.itemsOwned < 4 &&
+            GameState.Items.Any(i => i.itemCost < GameState.Gold &&
+                i.itemName.ToLower().Contains("potion")
+                && hero.health < 200
+        ))
+        {
+            BuyPotion(hero);
         }
 
-        if (GameState.AreUnitsAdvancing)
+        Console.Error.WriteLine($"{myUnitsAroundEnemyHero.Count()} vs {enemyUnitsAroundEnemyHero.Count()}");
+        if (myUnitsAroundEnemyHero.Count() > enemyUnitsAroundEnemyHero.Count() + 2
+            && hero.distanceFromEntity(GameState.EnemyTower) > 300)
         {
-            AdvanceWithUnits();
+            BeAggressive(hero);
             return;
         }
-
-        if (GameState.AreEnemyHeroesOverPushed)
+        else
         {
-            KiteEnemyHeroesToTower();
+            PlayPassive(hero);
             return;
         }
-
-
+        
         // Retreat if required
         if (furthestFriendlyUnit == null)
         {
-            if (hero.distanceFromEntity(friendlyTower) > 100)
+            if (hero.distanceFromEntity(GameState.MyTower) > 100)
             {
-                Actions.Move(friendlyTower.x, friendlyTower.y);
+                Actions.Move(GameState.MyTower.x, GameState.MyTower.y);
                 return;
             }
             else
@@ -171,10 +179,10 @@ static class Commands
             Actions.Attack(killEntity.unitId);
             return;
         }
-        else if ((enemyTower.distanceFromEntity(hero) - 100) <= enemyTower.distanceFromEntity(furthestFriendlyUnit))
+        else if ((GameState.EnemyTower.distanceFromEntity(hero) - 100) <= GameState.EnemyTower.distanceFromEntity(furthestFriendlyUnit))
         {
             Console.Error.WriteLine("Retreat behind friendly unit");
-            if (furthestFriendlyUnit.x > friendlyTower.x)
+            if (furthestFriendlyUnit.x > GameState.MyTower.x)
                 Actions.Move(furthestFriendlyUnit.x - 50, furthestFriendlyUnit.y);
             else
                 Actions.Move(furthestFriendlyUnit.x + 50, furthestFriendlyUnit.y);
@@ -187,7 +195,7 @@ static class Commands
         // Then attack enemy hero
         if (enemyHero != null
             && unitThreat == null
-            && enemyTower.distanceFromEntity(hero) > 300)
+            && GameState.EnemyTower.distanceFromEntity(hero) > 300)
         {
             Console.Error.WriteLine("Attack enemy hero");
             Actions.Attack(enemyHero.unitId);
@@ -222,15 +230,172 @@ static class Commands
             else
             {
                 Console.Error.WriteLine("Attack enemy tower");
-                Actions.Attack(enemyTower.unitId);
+                Actions.Attack(GameState.EnemyTower.unitId);
                 return;
             }
+        }
+    }
+
+    private static void Ambush(Entity hero)
+    {
+        Entity nearestEnemyHero = hero.nearestEntity("HERO", GameState.EnemyTeam);
+
+        if (1 == 1 // nearestEnemyHero != null && hero.distanceFromEntity(nearestEnemyHero) < 200
+            && ((hero.team == 0 && nearestEnemyHero.x < hero.x - 50) || (hero.team == 1 && nearestEnemyHero.x > hero.x + 50)))
+        {
+            int enemyUnitsNearEnemyHero =
+                GameState.Entities.Count(e => e.team == GameState.EnemyTeam
+                    && e.unitType == "UNIT"
+                    && e.distanceFromEntity(nearestEnemyHero) < 200);
+            int friendlyUnitsNearEnemyHero =
+                GameState.Entities.Count(e => e.team == GameState.MyTeam
+                    && e.unitType == "UNIT"
+                    && e.distanceFromEntity(nearestEnemyHero) < 200);
+
+            if (friendlyUnitsNearEnemyHero / 2 <= enemyUnitsNearEnemyHero)
+            {
+                Actions.Attack(nearestEnemyHero.unitId);
+            }
+            else
+            {
+                Actions.Wait();
+            }
+
+            return;
+        }
+        else
+        {
+            //Object bush = hero.nearestObject("BUSH");
+
+            Object bush = GameState.Objects
+                .OrderBy(b => b.distanceFromEntity(hero))
+                .FirstOrDefault(b => b.entityType == "BUSH" 
+                    && b.distanceFromEntity(GameState.MyTower) > 500
+                    && Math.Abs(b.y - GameState.MyTower.y) < 200);
+
+            if (bush == null)
+            {
+                Actions.Wait();
+            }
+            if (bush.x == hero.x && bush.y == hero.y)
+            {
+                Actions.Wait();
+            }
+            else
+            {
+                Actions.Move(bush.x, bush.y);
+            }
+            return;
         }
     }
 
     private static void KiteEnemyHeroesToTower()
     {
         throw new NotImplementedException();
+    }
+
+    private static void BeAggressive(Entity hero)
+    {
+        int buffer = 125;
+        int teamMulti = GameState.MyTeam == 0 ? 1 : -1;
+
+        Entity enemyHero = GameState.Entities
+            .OrderBy(e => e.distanceFromEntity(hero))
+            .First(e => e.team == GameState.EnemyTeam
+                && e.unitType == "HERO");
+
+        if (1 == 1)
+        {
+            //int attackX = hero.x - teamMulti *
+            //    ((enemyHero.attackRange - enemyHero.distanceFromEntity(hero) + buffer)); // removed buffer from attackX
+            //int attackY = hero.y > enemyHero.y ? hero.y - buffer : hero.y + buffer;
+            //Actions.MoveAttack(attackX, attackY, enemyHero.unitId);
+            Console.Error.WriteLine("ATTACK HERO");
+            Actions.Attack(enemyHero.unitId);
+            return;
+        }
+        
+        if (enemyHero.distanceFromEntity(hero) - buffer <= enemyHero.attackRange)
+        {
+            int retreatX = hero.x - teamMulti *
+                (enemyHero.attackRange - enemyHero.distanceFromEntity(hero) + buffer);
+            int retreatY = hero.y > enemyHero.y ? hero.y - buffer : hero.y + buffer;
+
+            //Actions.MoveAttack(retreatX, retreatY, hero.nearestEntity("UNIT", GameState.EnemyTeam).unitId);
+            Actions.Move(retreatX, retreatY);
+        }
+        else if (GameState.EnemyTower.distanceFromEntity(hero) - buffer <= GameState.EnemyTower.attackRange)
+        {
+            int retreatX = hero.x - teamMulti *
+                (GameState.EnemyTower.attackRange - GameState.EnemyTower.distanceFromEntity(hero) + buffer);
+            int retreatY = hero.y > GameState.EnemyTower.y ? hero.y - buffer : hero.y + buffer;
+
+            Actions.Move(retreatX, retreatY);
+        }
+        else
+        {
+            //Actions.Attack(hero.nearestEntity("UNIT", GameState.EnemyTeam).unitId);
+
+            int attackX = hero.x - teamMulti *
+                ((enemyHero.attackRange - enemyHero.distanceFromEntity(hero) + buffer) / 3); // removed buffer from attackX
+            int attackY = hero.y > enemyHero.y ? hero.y - buffer : hero.y + buffer;
+            Entity attackEnemy = GameState.Entities
+                .OrderBy(e => e.distanceFromEntity(hero))
+                .First(e => e.team == GameState.EnemyTeam);
+            Actions.MoveAttack(attackX, attackY, attackEnemy.unitId);
+            //Console.WriteLine($"FIREBALL {enemyHero.x} {enemyHero.y}");
+        }
+    }
+
+    private static void PlayPassive(Entity hero)
+    {
+        int buffer = 125;
+        int teamMulti = GameState.MyTeam == 0 ? 1 : -1;
+
+        // If no units in front, retreat
+        if (GameState.TeamHasEntities("UNIT", GameState.MyTeam) &&
+            GameState.EnemyTower.distanceFromEntity(GameState.EnemyTower.nearestEntity("UNIT", GameState.MyTeam)) >
+            GameState.EnemyTower.distanceFromEntity(hero))
+        {
+            Actions.Move(GameState.MyTower.x - (teamMulti * buffer), GameState.MyTower.y);
+            return;
+        }
+
+        Entity enemyHero = GameState.Entities
+            .OrderByDescending(e => e.attackRange - e.distanceFromEntity(hero))
+            .First(e => e.team == GameState.EnemyTeam
+                && e.unitType == "HERO");
+        
+        if (enemyHero.distanceFromEntity(hero) - buffer <= enemyHero.attackRange)
+        {
+            int retreatX = hero.x - teamMulti *
+                (enemyHero.attackRange - enemyHero.distanceFromEntity(hero) + buffer);
+            int retreatY = hero.y > enemyHero.y ? hero.y - buffer : hero.y + buffer;
+
+            //Actions.MoveAttack(retreatX, retreatY, hero.nearestEntity("UNIT", GameState.EnemyTeam).unitId);
+            Actions.Move(retreatX, retreatY);
+        }
+        else if (GameState.EnemyTower.distanceFromEntity(hero) - buffer <= GameState.EnemyTower.attackRange)
+        {
+            int retreatX = hero.x - teamMulti *
+                (GameState.EnemyTower.attackRange - GameState.EnemyTower.distanceFromEntity(hero) + buffer);
+            int retreatY = hero.y > GameState.EnemyTower.y ? hero.y - buffer : hero.y + buffer;
+
+            Actions.Move(retreatX, retreatY);
+        }
+        else
+        {
+            //Actions.Attack(hero.nearestEntity("UNIT", GameState.EnemyTeam).unitId);
+
+            int attackX = hero.x - teamMulti *
+                ((enemyHero.attackRange - enemyHero.distanceFromEntity(hero) + buffer) / 3); // removed buffer from attackX
+            int attackY = hero.y > enemyHero.y ? hero.y - buffer : hero.y + buffer;
+            Entity attackEnemy = GameState.Entities
+                .OrderBy(e => e.distanceFromEntity(hero))
+                .First(e => e.team == GameState.EnemyTeam);
+            Actions.MoveAttack(attackX, attackY, attackEnemy.unitId);
+            //Console.WriteLine($"FIREBALL {enemyHero.x} {enemyHero.y}");
+        }
     }
 
     private static void AdvanceWithUnits()
@@ -243,26 +408,116 @@ static class Commands
         Entity targetGroot = GameState.Entities
             .OrderBy(g => g.distanceFromEntity(hero))
             .FirstOrDefault(g => g.unitType == "GROOT"
-                && (GameState.EnemyHasNo("UNIT") || g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("UNIT", GameState.EnemyTeam)))
+                //&& (GameState.TeamHasEntities("UNIT", GameState.EnemyTeam) == false
+                //    || g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("UNIT", GameState.EnemyTeam)))
                 && (g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("HERO", GameState.EnemyTeam)))
-                && (g.distanceFromEntity(GameState.MyTower) < g.distanceFromEntity(GameState.EnemyTower)));
+                //&& (g.distanceFromEntity(GameState.MyTower) < g.distanceFromEntity(GameState.EnemyTower))
+                );
+
         Actions.MoveAttack(targetGroot.x, targetGroot.y, targetGroot.unitId);
     }
 
-    public static void BuyItems(Entity hero)
+    public static void BuyWeapon(Entity hero)
     {
         Item newItem = GameState.Items
             .OrderByDescending(i => i.itemCost)
             .FirstOrDefault(i => i.itemCost < GameState.Gold &&
                 i.itemName.ToLower().Contains("blade")
-                //&& i.itemName.ToLower().Contains("bronze") == false
+                && i.itemName.ToLower().Contains("bronze") == false
                 );
 
         if (newItem != null)
         {
             Actions.Buy(newItem.itemName);
-            //hero.items.Add(newItem);
+            GameState.Gold = GameState.Gold - newItem.itemCost;
         }
+    }
+
+    public static void BuyPotion(Entity hero)
+    {
+        Item newItem = GameState.Items
+            .OrderByDescending(i => i.itemCost)
+            .FirstOrDefault(i => i.itemCost < GameState.Gold &&
+                i.itemName.ToLower().Contains("potion")
+                );
+
+        if (newItem != null)
+        {
+            Actions.Buy(newItem.itemName);
+            GameState.Gold = GameState.Gold - newItem.itemCost;
+        }
+    }
+}
+
+class GameState
+{
+    public static int MyTeam { get; set; }
+    public static int EnemyTeam {
+        get
+        {
+            return MyTeam == 0 ? 1 : 0;
+        }
+    }
+    public static Entity MyTower
+    {
+        get
+        {
+            return GameState.Entities
+                .FirstOrDefault(e => e.team == GameState.MyTeam
+                    && e.unitType == "TOWER");
+        }
+    }
+    public static Entity EnemyTower
+    {
+        get
+        {
+            return GameState.Entities
+                .FirstOrDefault(e => e.team != GameState.MyTeam
+                    && e.unitType == "TOWER");
+        }
+    }
+    public static int Gold { get; set; }
+    public static int EnemyGold { get; set; }
+    public static int RoundType { get; set; }
+    public static int EntityCount { get; set; }
+    public static int ItemCount { get; set; }
+    public static int ObjectCount { get; set; }
+    
+    public static List<Entity> Entities;
+    public static List<Object> Objects;
+    public static List<Item> Items;
+
+    public static List<Entity> MyHeroes
+    {
+        get
+        {
+            return Entities.Where(e => e.unitType == "HERO"
+                && e.team == GameState.MyTeam).ToList<Entity>();
+        }
+    }
+
+    public static bool IsEasyGrootKill(Entity hero)
+    {
+        if (GameState.Entities.Any(e => e.unitType == "GROOT") == false)
+            return false;
+
+        Entity targetGroot = GameState.Entities
+            .OrderBy(g => g.distanceFromEntity(hero))
+            .FirstOrDefault(g => g.unitType == "GROOT"
+                //&& (GameState.TeamHasEntities("UNIT", GameState.EnemyTeam) == false
+                //    || g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("UNIT", GameState.EnemyTeam)))
+                && (g.distanceFromEntity(hero) - 100 < g.distanceFromEntity(g.nearestEntity("HERO", GameState.EnemyTeam)))
+                //&& (g.distanceFromEntity(GameState.MyTower) < g.distanceFromEntity(GameState.EnemyTower))
+                );
+
+        return targetGroot != null;
+}
+
+    public static bool TeamHasEntities(string unitType, int team)
+    {
+        return GameState.Entities
+            .Any(e => e.unitType == unitType
+                && e.team == team);
     }
 }
 
@@ -276,7 +531,7 @@ static class Actions
         }
         else
         {
-            Console.WriteLine("VALKYRIE");
+            Console.WriteLine("DEADPOOL");
         }
     }
 
@@ -316,6 +571,35 @@ static class Actions
     }
 }
 
+class Object
+{
+    public string entityType { get; set; } // BUSH, from wood1 it can also be SPAWN
+    public int x { get; set; }
+    public int y { get; set; }
+    public int radius { get; set; }
+
+    public Object()
+    {
+
+    }
+
+    public Object(string[] inputs)
+    {
+        entityType = inputs[0];
+        x = int.Parse(inputs[1]);
+        y = int.Parse(inputs[2]);
+        radius = int.Parse(inputs[3]);
+    }
+
+    public int distanceFromEntity(Entity e)
+    {
+        int xDistance = Math.Abs(e.x - this.x);
+        int yDistance = Math.Abs(e.y - this.y);
+
+        return Convert.ToInt32(Math.Sqrt((xDistance * xDistance) + (yDistance * yDistance)));
+    }
+}
+
 class Item
 {
     public string itemName { get; set; } // contains keywords such as BRONZE, SILVER and BLADE, BOOTS connected by "_" to help you sort easier
@@ -352,6 +636,9 @@ class Entity
     public int attackRange { get; set; }
     public int health { get; set; }
     public int mana { get; set; }
+    public int countDown1 { get; set; }
+    public int countDown2 { get; set; }
+    public int countDown3 { get; set; }
     public int attackDamage { get; set; }
     public int movementSpeed { get; set; }
     public int maxHealth { get; set; }
@@ -367,7 +654,7 @@ class Entity
     public int itemsOwned { get; set; }
 
     public List<Item> items { get; set; }
-    
+
     public Entity()
     {
         items = new List<Item>();
@@ -388,9 +675,9 @@ class Entity
         movementSpeed = int.Parse(inputs[10]);
         //stunDuration = int.Parse(inputs[11]), // useful in bronze
         goldValue = int.Parse(inputs[12]);
-        //countDown1 = int.Parse(inputs[13]), // all countDown and mana variables are useful starting in bronze
-        //countDown2 = int.Parse(inputs[14]),
-        //countDown3 = int.Parse(inputs[15]),
+        countDown1 = int.Parse(inputs[13]); // all countDown and mana variables are useful starting in bronze
+        countDown2 = int.Parse(inputs[14]);
+        countDown3 = int.Parse(inputs[15]);
         mana = int.Parse(inputs[16]);
         maxMana = int.Parse(inputs[17]);
         manaRegeneration = int.Parse(inputs[18]);
@@ -409,84 +696,34 @@ class Entity
         int xDistance = Math.Abs(e.x - this.x);
         int yDistance = Math.Abs(e.y - this.y);
 
+        if (xDistance + yDistance == 0)
+            return 0;
+
         return Convert.ToInt32(Math.Sqrt((xDistance * xDistance) + (yDistance * yDistance)));
+    }
+
+    public Entity nearestEntity(string unitType)
+    {
+        Entity entity = GameState.Entities
+            .OrderBy(e => e.distanceFromEntity(this))
+            .First(e => e.unitType == unitType);
+        return entity;
     }
 
     public Entity nearestEntity(string unitType, int team)
     {
         Entity entity = GameState.Entities
             .OrderBy(e => e.distanceFromEntity(this))
-            .FirstOrDefault(e => e.unitType == "unitType"
+            .First(e => e.unitType == unitType
                 && e.team == team);
         return entity;
     }
-}
 
-class Hero : Entity
-{
-    public Hero(string heroType, int health, int mana, int attackDamage,
-        int movementSpeed, int manaRegeneration, int attackRange)
+    public Object nearestObject(string entityType)
     {
-        unitType = "HERO";
-        this.heroType = heroType;
-        this.health = health;
-        this.mana = mana;
-        this.attackDamage = attackDamage;
-        this.movementSpeed = movementSpeed;
-        this.manaRegeneration = manaRegeneration;
-        this.attackRange = attackRange;
-    }
-}
-
-class GameState
-{
-    public static int MyTeam { get; set; }
-    public static int EnemyTeam {
-        get
-        {
-            return MyTeam == 1 ? 0 : 1;
-        }
-    }
-    public static int Gold { get; set; }
-    public static int EnemyGold { get; set; }
-    public static int RoundType { get; set; }
-    public static int EntityCount { get; set; }
-    public static int ItemCount { get; set; }
-    
-    public static List<Hero> Heroes;
-    public static List<Entity> Entities;
-    public static List<Item> Items;
-    public static List<Item> MyItems;
-
-    public static List<Entity> MyHeroes
-    {
-        get
-        {
-            return Entities.Where(e => e.unitType == "HERO").ToList<Entity>();
-        }
-    }
-
-    public static bool IsEasyGrootKill
-    {
-        get
-        {
-            Entity targetGroot
-
-            return false;
-        }
-    }
-    public static bool AreUnitsAdvancing
-    {
-        get
-        {
-            return false;
-        }
-    }
-    public static bool AreEnemyHeroesOverPushed
-    {
-        get
-        {
-            return false;
-        }
+        Object obj = GameState.Objects
+            .OrderBy(o => o.distanceFromEntity(this))
+            .First(o => o.entityType == entityType);
+        return obj;
     }
 }
